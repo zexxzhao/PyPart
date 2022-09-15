@@ -156,7 +156,7 @@ class HDF5File:
         write_data = self._write_rawdata
         m = meshpart.mesh
         # write public data (reordered): nodal coordinates, connectivity, adjacency list, element ID
-        write_data(dpath + 'x', m.node)
+        write_data(dpath + 'x', m.node.flatten())
         
         write_data(dpath + 'cell', m.cell)
 
@@ -168,7 +168,10 @@ class HDF5File:
         write_data(dpath + 'facet/id', m.facet_data)
 
         # write private data: epart, node offset
-        write_data(dpath + 'epart', meshpart.epart)
+        c = [[] for _ in range(max(meshpart.epart) + 1)]
+        for i, e in enumerate(meshpart.epart):
+            c[e].append(i)
+        write_data(dpath + 'epart', c)
         write_data(dpath + 'offset', meshpart.noffset)
 
 def main(argv):
