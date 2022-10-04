@@ -19,8 +19,14 @@ def to_csrlist(x):
  
     return data, offset 
 
+
 def remove_duplicates(x):
     return list(set(x))
+
+
+def topologic_dim(e):
+    m = {'vertex': 0, 'line': 1, 'triangle': 2, 'tetra': 3}
+    return m[e]
 
 class Mesh:
     def __init__(self, fname, generator='gmsh'):
@@ -43,33 +49,60 @@ class Mesh:
         self.cell_data = []
         self.facet_data = []
 
-        assert len(cells) == len(cell_data), 'Unmatched cell and cell data'
+        if len(cells) != len(cell_data):
+            raise ValueError('Unmatched cell and cell data')
         for itype in range(len(cells)):
             cell = cells[itype]
             data = cell_data[itype] 
 
-            if cell.dim == dim:
+            cell_dim = topologic_dim(cell[0])
+            if cell_dim == dim:
                 self.cell += cell.data.tolist()
                 self.cell_data += data.tolist()
-            elif cell.dim == dim - 1:
+            elif cell_dim == dim - 1:
                 self.facet += cell.data.tolist()
                 self.facet_data += data.tolist()
         
         self.cell_data = np.array(self.cell_data)
         self.facet_data = np.array(self.facet_data)
 
+
     def match(self):
         cells = self.cell #[element for celltype in self.cell for element in celltype] 
         facets = self.facet #[element for celltype in self.facet for element in celltype]
 
         def collide(f, e):
-            return all([any(e == i) for i in f])
+            elem = set(e)
+            return all([i in elem for i in f])
         def orientation(f, e):
-            assert len(e) == 4, 'Support tetrahedron only'
+            if len(e) != 4:
+                raise RuntimeError('Support tetrahedron only')
             unfound = sum(e) - sum(f)
             return np.argwhere(np.array(e) == unfound).squeeze()
 
-        facet_to_element = [[ielem for ielem in range(cells) if collide(f, cells[ielem])] for f in facets]
+        #facet_to_element = [[ielem for ielem in range(len(cells)) if collide(f, cells[ielem])] for f in facets]
+        #reverse cell
+        v2c = [[] for _ in range(len(cells))]
+        for ielem, elem in enumerate(cells):
+            for v in elem:
+                v2c[v].append(ielem) 
+        v2c = [remove_duplicates(m) for m in v2c]
+
+        facet_to_element = []
+        for ii, f in enumerate(facets):
+            print(f'{ii}/{len(facets)}')
+            connected_cells = []
+            for v in f:
+                connected_cells += v2c[v]
+            values, counts = np.unique(connected_cells, return_counts=True)
+            #facet_to_element.append([ielem for ielem in range(len(cells)) if collide(f, cells[ielem])])
+            argmax_all = np.argwhere(counts == np.max(counts)).squeeze().tolist()
+            if isinstance(argmax_all, int):
+                facet_to_element.append([values[argmax_all]])
+            elif isinstance(argmax_all, list):
+                facet_to_element.append(values[argmax_all])
+            else:
+                raise RuntimeError(f"Unsupported type: {type(argmax_all)}")
         facet_orientation = [[orientation(facets[ifacet], cells[ielem]) for ielem in c] for ifacet, c in enumerate(facet_to_element)]
         return facet_to_element, facet_to_element
 
@@ -91,7 +124,7 @@ class MeshPart:
         # concat elements
         #cells = [element for celltype in self.mesh.cell for element in celltype.data] 
         import pymetis
-        _, epart, npart = pymetis.part_mesh(n, self.mesh.cell, gtype_nodal=False) 
+        _, epart, npart = pymetis.part_mesh(n, self.mesh.cell, None, None, gtype=pymetis.GType.DUAL) 
         return epart, npart
 
     def reorder(self):
@@ -161,6 +194,9 @@ class HDF5File:
         write_data(dpath + 'cell', m.cell)
 
         write_data(dpath + 'facet', m.facet)
+        _f2e, _for = m.match()
+        write_data(dpath + 'facet/f2e', _f2e)
+        write_data(dpath + 'facet/for', _for)
 
         write_data(dpath + 'adjacency', m.adjacency_list())
 
@@ -185,5 +221,8 @@ def main(argv):
     f.write('mesh', meshpart)
 
 if __name__ == '__main__':
-    sys.exit(main(sys.argv))
+    if len(sys.argv) == 4:
+        sys.exit(main(sys.argv))
+    else:
+        print("python3 main.py [INPUT] [OUTPUT] [NPART]")
 
