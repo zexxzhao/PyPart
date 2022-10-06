@@ -193,7 +193,7 @@ class HDF5File:
         write_data = self._write_rawdata
         m = meshpart.mesh
         # write public data (reordered): nodal coordinates, connectivity, adjacency list, element ID
-        write_data(dpath + 'x', m.node.flatten())
+        write_data(dpath + 'node/x', m.node.flatten())
         
         write_data(dpath + 'cell', m.cell)
 
@@ -202,7 +202,7 @@ class HDF5File:
         write_data(dpath + 'facet/f2e', _f2e)
         write_data(dpath + 'facet/for', _for)
 
-        write_data(dpath + 'adjacency', m.adjacency_list())
+        write_data(dpath + 'node/adjacency', m.adjacency_list())
 
         write_data(dpath + 'cell/id', m.cell_data)
         write_data(dpath + 'facet/id', m.facet_data)
@@ -212,7 +212,7 @@ class HDF5File:
         for i, e in enumerate(meshpart.epart):
             c[e].append(i)
         write_data(dpath + 'epart', c)
-        write_data(dpath + 'offset', meshpart.noffset)
+        write_data(dpath + 'node/offset', meshpart.noffset)
 
 def main(argv):
     input_mesh = argv[1]
@@ -225,7 +225,7 @@ def main(argv):
     meshpart = MeshPart(mesh, nparts)
     print("Done")
 
-    print("Reading mesh: ", end='', flush=True)
+    print("Writing mesh: ", end='', flush=True)
     f = HDF5File(output_mesh, 'w')
     f.write('mesh', meshpart)
     print("Done")
