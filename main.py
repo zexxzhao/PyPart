@@ -13,7 +13,7 @@ def to_csrlist(x):
     data = []
     size = []
     for piece in x:
-        data += piece
+        data += piece if isinstance(piece, list) else piece.tolist()
         size.append(len(piece))
     offset = prefix_sum(size)
  
@@ -38,6 +38,7 @@ class Mesh:
             raise ValueError(f'Unknown generator: {generator}')
 
         import meshio
+        major, minor, _ = meshio.__version__.split('.')
         m = meshio.read(fname)
         self.node = m.points
         dim = self.node.shape[1]
@@ -55,7 +56,10 @@ class Mesh:
             cell = cells[itype]
             data = cell_data[itype] 
 
-            cell_dim = topologic_dim(cell[0])
+            if int(major) <= 4:
+                cell_dim = topologic_dim(cell[0])
+            else:
+                cell_dim = cell.dim
             if cell_dim == dim:
                 self.cell += cell.data.tolist()
                 self.cell_data += data.tolist()
@@ -90,7 +94,7 @@ class Mesh:
 
         facet_to_element = []
         for ii, f in enumerate(facets):
-            print(f'{ii}/{len(facets)}')
+            #print(f'{ii}/{len(facets)}')
             connected_cells = []
             for v in f:
                 connected_cells += v2c[v]
@@ -214,11 +218,17 @@ def main(argv):
     input_mesh = argv[1]
     output_mesh = argv[2]
     nparts = int(argv[3])
+    print("Reading mesh: ", end='', flush=True)
     mesh = Mesh(input_mesh)
+    print("Done", flush=True)
+    print("Paritioning: ", end='', flush=True)
     meshpart = MeshPart(mesh, nparts)
+    print("Done")
 
+    print("Reading mesh: ", end='', flush=True)
     f = HDF5File(output_mesh, 'w')
     f.write('mesh', meshpart)
+    print("Done")
 
 if __name__ == '__main__':
     if len(sys.argv) == 4:
