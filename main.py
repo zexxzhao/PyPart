@@ -170,12 +170,13 @@ class HDF5File:
 
     def _write_rawdata(self, path, data):
 
-        if isinstance(data, list) and isinstance(data[0], list):
-            data, offset = to_csrlist(data)
-            self.handler.create_dataset(path + '/0', data=data)
-            self.handler.create_dataset(path + '/1', data=offset)
-        elif isinstance(data, list) and isinstance(data[0], (int, float)):
-            self.handler.create_dataset(path, data=np.array(data))
+        if isinstance(data, list):
+            if len(data) == 0 or isinstance(data[0], list):
+                data, offset = to_csrlist(data)
+                self.handler.create_dataset(path + '/0', data=data)
+                self.handler.create_dataset(path + '/1', data=offset)
+            elif isinstance(data[0], (int, float)):
+                self.handler.create_dataset(path, data=np.array(data))
         elif isinstance(data, np.ndarray):
             self.handler.create_dataset(path, data=data)
         else:
