@@ -67,8 +67,8 @@ class Mesh:
                 self.facet += cell.data.tolist()
                 self.facet_data += data.tolist()
         
-        self.cell_data = np.array(self.cell_data)
-        self.facet_data = np.array(self.facet_data)
+        self.cell_data = np.array(self.cell_data, dtype=np.int64)
+        self.facet_data = np.array(self.facet_data, dtype=np.int64)
 
 
     def match(self):
@@ -168,17 +168,19 @@ class HDF5File:
         self.name = fname
         self.handler = h5py.File(fname, mode)
 
-    def _write_rawdata(self, path, data):
+    def _write_rawdata(self, path, data, dtype=None):
+        if dtype is None:
+            dtype = 'f'
 
         if isinstance(data, list):
             if len(data) == 0 or isinstance(data[0], list):
                 data, offset = to_csrlist(data)
-                self.handler.create_dataset(path + '/0', data=data)
-                self.handler.create_dataset(path + '/1', data=offset)
+                self.handler.create_dataset(path + '/0', data=data, dtype='i8')
+                self.handler.create_dataset(path + '/1', data=offset, dtype='i8')
             elif isinstance(data[0], (int, float)):
                 self.handler.create_dataset(path, data=np.array(data))
         elif isinstance(data, np.ndarray):
-            self.handler.create_dataset(path, data=data)
+            self.handler.create_dataset(path, data=data, dtype=dtype)
         else:
             raise TypeError(f'Unsupported datatype: {type(data)}')
            
@@ -196,24 +198,24 @@ class HDF5File:
         # write public data (reordered): nodal coordinates, connectivity, adjacency list, element ID
         write_data(dpath + 'node/x', m.node.flatten())
         
-        write_data(dpath + 'cell', m.cell)
+        write_data(dpath + 'cell', m.cell, 'i8')
 
-        write_data(dpath + 'facet', m.facet)
+        write_data(dpath + 'facet', m.facet, 'i8')
         _f2e, _for = m.match()
-        write_data(dpath + 'facet/f2e', _f2e)
-        write_data(dpath + 'facet/for', _for)
+        write_data(dpath + 'facet/f2e', _f2e, 'i8')
+        write_data(dpath + 'facet/for', _for, 'i8')
 
-        write_data(dpath + 'node/adjacency', m.adjacency_list())
+        write_data(dpath + 'node/adjacency', m.adjacency_list(), 'i8')
 
-        write_data(dpath + 'cell/id', m.cell_data)
-        write_data(dpath + 'facet/id', m.facet_data)
+        write_data(dpath + 'cell/id', m.cell_data, 'i8')
+        write_data(dpath + 'facet/id', m.facet_data, 'i8')
 
         # write private data: epart, node offset
         c = [[] for _ in range(max(meshpart.epart) + 1)]
         for i, e in enumerate(meshpart.epart):
             c[e].append(i)
-        write_data(dpath + 'epart', c)
-        write_data(dpath + 'node/offset', meshpart.noffset)
+        write_data(dpath + 'epart', c, 'i8')
+        write_data(dpath + 'node/offset', meshpart.noffset, 'i8')
 
 def main(argv):
     input_mesh = argv[1]
