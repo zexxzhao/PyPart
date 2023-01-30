@@ -2,6 +2,10 @@ import sys
 import numpy as np
 import h5py
 
+
+#print formatting
+shift = 0
+
 def prefix_sum(x):
     prefix = [0]
     for i in range(len(x)):
@@ -25,7 +29,7 @@ def remove_duplicates(x):
 
 
 def topologic_dim(e):
-    m = {'vertex': 0, 'line': 1, 'triangle': 2, 'tetra': 3}
+    m = {'vertex': 0, 'line': 1, 'triangle': 2, 'tetra': 3, 'wedge': 3}
     return m[e]
 
 class Mesh:
@@ -33,17 +37,22 @@ class Mesh:
         if generator == 'gmsh':
             key = 'gmsh:physical'
         elif generator == 'ansa':
-            key = 'ansa:geometrical'
+            key = 'gmsh:geometrical'
         else:
             raise ValueError(f'Unknown generator: {generator}')
 
         import meshio
         major, minor, _ = meshio.__version__.split('.')
         m = meshio.read(fname)
+        self.print_info(m)
+
         self.node = m.points
         dim = self.node.shape[1]
         cells = m.cells
-        cell_data = m.cell_data[key]
+        if key in m.cell_data:
+            cell_data = m.cell_data[key]
+        else:
+            cell_data = [np.zeros(len(e), dtype=np.int32) for e in cells] 
 
         self.cell = []
         self.facet = []
@@ -79,14 +88,21 @@ class Mesh:
             elem = set(e)
             return all([i in elem for i in f])
         def orientation(f, e):
-            if len(e) != 4:
-                raise RuntimeError('Support tetrahedron only')
-            unfound = sum(e) - sum(f)
-            return np.argwhere(np.array(e) == unfound).squeeze()
+            if len(e) == 4: # tetrahedron
+                unfound = sum(e) - sum(f)
+                return np.argwhere(np.array(e) == unfound).squeeze()
+            elif len(e) == 6: # prism
+                if all(vtx in e[0:3] for vtx in f):
+                    return 0
+                elif all(vtx in e[3:6] for vtx in f):
+                    return 4
+                else:
+                    raise RuntimeError(f"Failed to find the facet orientation in prism.")
+            else:
+                raise RuntimeError(f"Unsupported element type: len(e) ={len(e)} and len(f) = {len(f)}.")
 
-        #facet_to_element = [[ielem for ielem in range(len(cells)) if collide(f, cells[ielem])] for f in facets]
-        #reverse cell
-        v2c = [[] for _ in range(len(cells))]
+        #v2c = [[] for _ in range(len(cells))]
+        v2c = [[] for _ in range(self.node.shape[0])]
         for ielem, elem in enumerate(cells):
             for v in elem:
                 v2c[v].append(ielem) 
@@ -108,7 +124,7 @@ class Mesh:
             else:
                 raise RuntimeError(f"Unsupported type: {type(argmax_all)}")
         facet_orientation = [[orientation(facets[ifacet], cells[ielem]) for ielem in c] for ifacet, c in enumerate(facet_to_element)]
-        return facet_to_element, facet_to_element
+        return facet_to_element, facet_orientation
 
     def adjacency_list(self):
         adjacency = [[] for _ in range(self.node.shape[0])]
@@ -118,12 +134,23 @@ class Mesh:
 
         return [remove_duplicates(conn) for conn in adjacency]
 
+    def print_info(self, m):
+        global shift
+        shift += 4
+        print(" " * shift + f"Mesh<{m.points.shape[1]}>:")
+        print(" " * shift + f"Entity number: node [{m.points.shape[0]}], ", end="")
+        element = [f"{e.type}: {len(e)}" for e in m.cells]
+        print(" " * shift + ", ".join(element))
+        shift -= 4
+
 
 class MeshPart:
     def __init__(self, mesh, n):
         self.mesh = mesh
         self.epart, self.npart = self.partition(n)
         self.noffset = self.reorder()
+        self.print_info()
+
     def partition(self, n):
         # concat elements
         #cells = [element for celltype in self.mesh.cell for element in celltype.data] 
@@ -163,10 +190,27 @@ class MeshPart:
         m.facet = [[old2new[n] for n in e] for e in m.facet]
         return offset 
 
+    def print_info(self):
+        def count(array, target):
+            return np.sum(np.asarray(array) == target)
+
+        global shift
+        shift += 4
+        n = max(self.npart) + 1
+        nnode_per_part = [count(self.npart, rank) for rank in range(n)]
+        nelem_per_part = [count(self.epart, rank) for rank in range(n)]
+        print(" " * shift + f"Node: ", end='')
+        print(nnode_per_part)
+        print(" " * shift + f"Element: ", end='')
+        print(nelem_per_part)
+        shift -= 4
+
+
 class HDF5File:
     def __init__(self, fname, mode='w'):
         self.name = fname
         self.handler = h5py.File(fname, mode)
+        self.print_info()
 
     def _write_rawdata(self, path, data, dtype=None):
         if dtype is None:
@@ -217,25 +261,35 @@ class HDF5File:
         write_data(dpath + 'epart', c, 'i8')
         write_data(dpath + 'node/offset', meshpart.noffset, 'i8')
 
+    def print_info(self):
+        global shift
+        shift += 4
+        print(' ' * shift + f'filename: {self.name}')
+        shift -= 4
+
+
 def main(argv):
     input_mesh = argv[1]
     output_mesh = argv[2]
     nparts = int(argv[3])
+    generator = 'gmsh'
+    if len(argv) > 4:
+        generator = argv[4]
     print("Reading mesh: ", end='', flush=True)
-    mesh = Mesh(input_mesh)
-    print("Done", flush=True)
-    print("Paritioning: ", end='', flush=True)
+    mesh = Mesh(input_mesh, generator)
+    print(" " * shift + "Done", flush=True)
+    print("Paritioning: ", flush=True)
     meshpart = MeshPart(mesh, nparts)
-    print("Done")
+    print(" " * shift + "Done")
 
-    print("Writing mesh: ", end='', flush=True)
+    print("Writing mesh: ", flush=True)
     f = HDF5File(output_mesh, 'w')
     f.write('mesh', meshpart)
-    print("Done")
+    print(" " * shift + "Done")
 
 if __name__ == '__main__':
-    if len(sys.argv) == 4:
+    if len(sys.argv) >= 4:
         sys.exit(main(sys.argv))
     else:
-        print("python3 main.py [INPUT] [OUTPUT] [NPART]")
+        print("python3 main.py [INPUT] [OUTPUT] [NPART] [Optional: MESH_GENERATOR]")
 
