@@ -1,7 +1,69 @@
 # PyPart
-A Python3 tool to partition meshes
+A Python3 tool to partition meshes for XXX
 ## External dependencies
-0. numpy
-1. MeshIO
-2. PyMetis
-3. h5py
+0. Python (>= 3.6)
+1. numpy
+2. meshio
+3. h5py<br />
+Simply install them with
+```bash
+pip3 install --user numpy meshio h5py
+```
+4. PyMetis<br />
+Download from https://github.com/inducer/pymetis instead of using `pip`. The `PyPI` version is 6 commits behind github (03/18/2023), and some important features are not updated. (TODO: Update this if newer a PyMetis has been released).
+## Usage
+Use `python3 main.py --help` to print the usage information. It typically goes like
+```bash
+python3 main.py cylinder.msh cylinder.h5 16
+```
+where `cylinder.msh` is the raw mesh file and `cylinder.h5` is the partitioned one, which is divided into 16 submeshes.
+## Mesh file hierarchy
+(TODO: Add more descriptions)
+```
+mesh/
+├── cell
+│   ├── 0
+│   ├── 1
+│   └── id
+├── epart
+│   ├── 0
+│   └── 1
+├── facet
+│   ├── 0
+│   ├── 1
+│   ├── f2e
+│   │   ├── 0
+│   │   └── 1
+│   ├── for
+│   │   ├── 0
+│   │   └── 1
+│   └── id
+└── node
+    ├── adjacency
+    │   ├── 0
+    │   └── 1
+    ├── offset
+    └── x
+```
+## Known issues
+### limited element types
+#### 3D
+- [x] tetrahedron
+  - [x] triangle
+- [x] prism
+  - [x] triangle
+  - [ ] quadrilateral
+- [ ] hexahedron
+  - [ ] quadrilateral
+- [ ] B-spline
+- [ ] Nurbs
+#### 2D
+- [ ] triangle
+  - [ ] line
+- [ ] quadrilateral
+  - [ ] line
+#### 1D
+- [ ] line
+  - [ ] point
+
+
