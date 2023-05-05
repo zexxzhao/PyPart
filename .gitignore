@@ -1,1 +1,7 @@
 test/*
+
+# PIP files
+build/
+dist/
+pypart.egg-info/
+

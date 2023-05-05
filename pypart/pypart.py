@@ -268,7 +268,7 @@ class HDF5File:
         shift -= 4
 
 
-def main(argv):
+def partition_mesh(argv):
     input_mesh = argv[1]
     output_mesh = argv[2]
     nparts = int(argv[3])
@@ -287,9 +287,12 @@ def main(argv):
     f.write('mesh', meshpart)
     print(" " * shift + "Done")
 
-if __name__ == '__main__':
+
+def main():
     if len(sys.argv) >= 4:
-        sys.exit(main(sys.argv))
+        sys.exit(partition_mesh(sys.argv))
     else:
         print("python3 main.py [INPUT] [OUTPUT] [NPART] [Optional: MESH_GENERATOR]")
 
+if __name__ == '__main__':
+    main()
