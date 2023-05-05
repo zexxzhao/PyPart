@@ -1,20 +1,24 @@
 # PyPart
 A Python3 tool to partition meshes for XXX
 ## External dependencies
-0. Python (>= 3.6)
+0. Python (>= 3.8)
 1. numpy
 2. meshio
-3. h5py<br />
-Simply install them with
+3. h5py
+4. PyMetis
+## Installation
+Install wheel first if you don't have it
 ```bash
-pip3 install --user numpy meshio h5py
+pip3 install wheel
 ```
-4. PyMetis<br />
-Download from https://github.com/inducer/pymetis instead of using `pip`. The `PyPI` version is 6 commits behind github (03/18/2023), and some important features are not updated. (TODO: Update this if newer a PyMetis has been released).
-## Usage
-Use `python3 main.py --help` to print the usage information. It typically goes like
+Then,
 ```bash
-python3 main.py cylinder.msh cylinder.h5 16
+pip3 install . 
+```
+# Usage
+Use `pypart --help` to print the usage information. It typically goes like
+```bash
+pypart cylinder.msh cylinder.h5 16
 ```
 where `cylinder.msh` is the raw mesh file and `cylinder.h5` is the partitioned one, which is divided into 16 submeshes.
 ## Mesh file hierarchy
