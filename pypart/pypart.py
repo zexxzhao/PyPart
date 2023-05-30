@@ -240,7 +240,7 @@ class HDF5File:
         write_data = self._write_rawdata
         m = meshpart.mesh
         # write public data (reordered): nodal coordinates, connectivity, adjacency list, element ID
-        write_data(dpath + 'node/x', m.node.flatten())
+        write_data(dpath + 'node/x', m.node.flatten(), 'f8')
         
         write_data(dpath + 'cell', m.cell, 'i8')
 
